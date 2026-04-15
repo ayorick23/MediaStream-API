@@ -1,4 +1,4 @@
-# Multimedia Stream API
+﻿# Multimedia Stream API
 
 Esta es una API robusta y escalable desarrollada en C# para la gestión y reproducción de contenido multimedia. El proyecto ha sido diseñado siguiendo los principios de Clean Architecture, lo que permite una separación de responsabilidades clara y facilita su crecimiento para ser consumido por aplicaciones web modernas.
 
@@ -25,23 +25,54 @@ El proyecto se divide en las siguientes capas para asegurar la mantenibilidad y 
 ```bash
 git clone https://github.com/ayorick23/MediaStream-API
 ```
-  
-2. **Configurar la base de datos (carpeta):** Actualiza la cadena de conexión en el archivo ``appsettings.json`` dentro del proyecto de la API.
-3. **Ejecutar migraciones (pendiente):**
+
+2. **Configurar el Connection String:**
+
+   Antes de ejecutar el proyecto, debes configurar la cadena de conexión a tu base de datos:
+
+   - Abre el archivo `appsettings.json` ubicado en la raíz del proyecto
+   - Localiza la sección `ConnectionStrings` y agrega tu cadena de conexión:
+   
+   ```json
+   "ConnectionStrings": {
+     "DefaultConnection": "Server=localhost;Database=MediaStreamDB;Trusted_Connection=True;TrustServerCertificate=True"
+   }
+   ```
+   
+   O si usas autenticación SQL Server:
+   
+   ```json
+   "ConnectionStrings": {
+     "DefaultConnection": "Server=localhost;Database=MediaStreamDB;User Id=tu_usuario;Password=tu_contraseña;TrustServerCertificate=True"
+   }
+   ```
+
+3. **Configurar la ruta de almacenamiento de medios:**
+
+   En el archivo `appsettings.json`, configura la ruta donde se almacenarán los archivos multimedia:
+   
+   ```json
+   "MediaSettings": {
+     "StoredFilesPath": "C:\\Ruta\\A\\Tu\\Carpeta",
+     "AllowedExtensions": [ ".mp4", ".mkv", ".mp3", ".wav" ]
+   }
+   ```
+
+4. **Ejecutar migraciones:**
 
 ```bash
-dotnet ef database update --project Infrastructure --startup-project API
+dotnet ef database update --project Proyecto.Infrastructure --startup-project Proyecto
 ```
 
-4. **Iniciar la aplicación:**
+5. **Iniciar la aplicación:**
 
 ```bash
-dotent run --project API
+dotnet run --project Proyecto
 ```
 
 # 🛣️ Roadmap / Próximos Pasos
 
-- [ ] Implementar autenticación y autorización con JWT.
+- [x] Implementar autenticación y autorización con JWT.
 - [ ] Integración con proveedores de almacenamiento en la nube (AWS S3 / Azure Blob Storage).
 - [ ] Implementar transcodificación de video en segundo plano.
 - [ ] Desarrollo de cliente web para consumo de la API.

@@ -63,6 +63,13 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# .NET 5+ (including .NET 10)
+*.sourcelink.json
+*.deps.json
+*.runtimeconfig.json
+*.dll
+*.exe
+
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 
