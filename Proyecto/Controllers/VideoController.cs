@@ -1,7 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Proyecto.Application.Interfaces;
 using Proyecto.Domain.Configuration;
+using Proyecto.Infrastructure.Persistence;
 using Microsoft.Extensions.Options;
+using System.Security.Claims;
 
 namespace Proyecto.Api.Controllers;
 
@@ -10,48 +14,55 @@ namespace Proyecto.Api.Controllers;
 public class VideosController : ControllerBase
 {
     private readonly IVideoStreamingService _streamingService;
-    private readonly IMediaUploadService _uploadService; // Nuevo servicio
+    private readonly IMediaUploadService _uploadService;
     private readonly MediaSettings _settings;
+    private readonly ApplicationDbContext _context;
 
     public VideosController(
         IVideoStreamingService streamingService,
-        IMediaUploadService uploadService, // nuevo servicio subida
-        IOptions<MediaSettings> settings)
+        IMediaUploadService uploadService,
+        IOptions<MediaSettings> settings,
+        ApplicationDbContext context)
     {
         _streamingService = streamingService;
         _uploadService = uploadService;
         _settings = settings.Value;
+        _context = context;
     }
 
-    // iniciamos el método de subida de archivos multimedia (video/audio)
     [HttpPost("upload")]
-    [DisableRequestSizeLimit] // Importante para permitir archivos de video grandes
-    public async Task<IActionResult> Upload(IFormFile file)
+    [Authorize(Roles = "Admin")]
+    [DisableRequestSizeLimit]
+    public async Task<IActionResult> Upload(IFormFile file, [FromForm] string? title, [FromForm] Guid categoryId)
     {
-        // 1. Validaciones básicas
         if (file == null || file.Length == 0)
             return BadRequest("No se ha seleccionado ningún archivo.");
 
         try
         {
-            // 2. Validar extensión contra nuestra lista permitida en appsettings.json
             var extension = Path.GetExtension(file.FileName).ToLower();
             if (!_settings.AllowedExtensions.Contains(extension))
             {
                 return BadRequest($"La extensión {extension} no está permitida.");
             }
 
-            // 3. Procesar la subida
-            // Usamos 'OpenReadStream' para obtener el flujo sin cargar el archivo en RAM
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
             using (var stream = file.OpenReadStream())
             {
-                // Llamamos al método de la infraestructura que definimos en MediaUploadService
-                var resultado = await _uploadService.UploadMediaAsync(stream, file.FileName);
+                var (id, archivo) = await _uploadService.UploadMediaAsync(
+                    stream,
+                    file.FileName,
+                    title ?? file.FileName,
+                    userId,
+                    categoryId
+                );
 
                 return Ok(new
                 {
                     Mensaje = "Archivo subido correctamente",
-                    Archivo = resultado
+                    Archivo = archivo,
+                    Id = id
                 });
             }
         }
@@ -60,29 +71,58 @@ public class VideosController : ControllerBase
             return StatusCode(500, $"Error interno al subir el archivo: {ex.Message}");
         }
     }
-    // terminamos el método de subida y ahora implementamos el método de streaming
+
+    [HttpGet("media/{id}")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var media = await _context.Media
+            .Include(m => m.Category)
+            .FirstOrDefaultAsync(m => m.Id == id);
+
+        if (media == null) return NotFound();
+
+        return Ok(new
+        {
+            media.Id,
+            media.Title,
+            media.Description,
+            Category = new { media.Category.Id, media.Category.Name },
+            media.MimeType,
+            media.FileSizeBytes,
+            MediaType = media.MediaType.ToString(),
+            media.Views,
+            media.CreatedAt,
+        });
+    }
+
+    [HttpPost("media/{id}/view")]
+    public async Task<IActionResult> RegisterView(Guid id)
+    {
+        var media = await _context.Media.FirstOrDefaultAsync(m => m.Id == id);
+
+        if (media == null) return NotFound();
+
+        media.Views++;
+        await _context.SaveChangesAsync();
+
+        return Ok(new { views = media.Views });
+    }
 
     [HttpGet("stream/{nombreArchivo}")]
     public IActionResult StreamVideo(string nombreArchivo)
     {
         try
         {
-            // 1. Validar extensión (Seguridad básica)
             var extension = Path.GetExtension(nombreArchivo).ToLower();
             if (!_settings.AllowedExtensions.Contains(extension))
             {
                 return BadRequest("Formato de archivo no permitido.");
             }
 
-            // 2. Obtener el Stream desde la capa de Infraestructura
             var stream = _streamingService.GetVideoStream(nombreArchivo);
 
-            // 3. Determinar el tipo MIME
-            // Si es .mp4 -> video/mp4 | Si es .mp3 -> audio/mpeg
             string contentType = extension == ".mp3" ? "audio/mpeg" : "video/mp4";
 
-            // 4. RETORNO MAESTRO
-            // 'enableRangeProcessing: true' es lo que permite el streaming real (HTTP 206)
             return File(stream, contentType, enableRangeProcessing: true);
         }
         catch (FileNotFoundException)
