@@ -10,15 +10,57 @@ namespace Proyecto.Api.Controllers;
 public class VideosController : ControllerBase
 {
     private readonly IVideoStreamingService _streamingService;
+    private readonly IMediaUploadService _uploadService; // Nuevo servicio
     private readonly MediaSettings _settings;
 
     public VideosController(
         IVideoStreamingService streamingService,
+        IMediaUploadService uploadService, // nuevo servicio subida
         IOptions<MediaSettings> settings)
     {
         _streamingService = streamingService;
+        _uploadService = uploadService;
         _settings = settings.Value;
     }
+
+    // iniciamos el método de subida de archivos multimedia (video/audio)
+    [HttpPost("upload")]
+    [DisableRequestSizeLimit] // Importante para permitir archivos de video grandes
+    public async Task<IActionResult> Upload(IFormFile file)
+    {
+        // 1. Validaciones básicas
+        if (file == null || file.Length == 0)
+            return BadRequest("No se ha seleccionado ningún archivo.");
+
+        try
+        {
+            // 2. Validar extensión contra nuestra lista permitida en appsettings.json
+            var extension = Path.GetExtension(file.FileName).ToLower();
+            if (!_settings.AllowedExtensions.Contains(extension))
+            {
+                return BadRequest($"La extensión {extension} no está permitida.");
+            }
+
+            // 3. Procesar la subida
+            // Usamos 'OpenReadStream' para obtener el flujo sin cargar el archivo en RAM
+            using (var stream = file.OpenReadStream())
+            {
+                // Llamamos al método de la infraestructura que definimos en MediaUploadService
+                var resultado = await _uploadService.UploadMediaAsync(stream, file.FileName);
+
+                return Ok(new
+                {
+                    Mensaje = "Archivo subido correctamente",
+                    Archivo = resultado
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error interno al subir el archivo: {ex.Message}");
+        }
+    }
+    // terminamos el método de subida y ahora implementamos el método de streaming
 
     [HttpGet("stream/{nombreArchivo}")]
     public IActionResult StreamVideo(string nombreArchivo)

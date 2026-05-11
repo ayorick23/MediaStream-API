@@ -9,6 +9,8 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
         services.AddScoped<IVideoStreamingService, VideoStreamingService>();
+        // Nuevo servicio para subir archivos multimedia
+        services.AddScoped<IMediaUploadService, MediaUploadService>();
         return services;
     }
 }

@@ -74,6 +74,27 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+// inyectamos el servicio de subida de archivos multimedia
+// Configuración para el servidor Kestrel (el que usa .NET internamente)
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // Establecemos el límite a 500 MB (se puede ajustar según necesidad)
+    options.Limits.MaxRequestBodySize = 524288000;
+});
+
+// Configuración para el manejo de formularios (Multipart)
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 524288000;
+});
+// finalizamos la configuración para permitir archivos grandes
+
+// Configuración de CORS para permitir solicitudes desde cualquier origen para desarrollo y pruebas. En producción, se recomienda configurar CORS de manera más restrictiva para mejorar la seguridad.
+builder.Services.AddCors(options => {
+    options.AddPolicy("AllowAll", p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+});
+// finaliza la configuracion CORS para puntos http
+
 var app = builder.Build();
 
 // Configure Swagger middleware
