@@ -8,5 +8,5 @@ public interface IMediaUploadService
     /// <param name="fileStream">Flujo de datos del archivo recibido.</param>
     /// <param name="fileName">Nombre original o deseado del archivo.</param>
     /// <returns>El nombre final con el que se guardó el archivo.</returns>
-    Task<string> UploadMediaAsync(Stream fileStream, string fileName);
+    Task<(Guid Id, string FileName)> UploadMediaAsync(Stream fileStream, string fileName, string title, string userId, Guid categoryId);
 }

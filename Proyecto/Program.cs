@@ -9,6 +9,7 @@ using Proyecto.Infrastructure;
 using Proyecto.Infrastructure.Persistence;
 using Proyecto.Infrastructure.Persistence.Repositories;
 using Proyecto.Infrastructure.Security;
+using Proyecto.Domain.Entities.Media;
 
 // Importante para ver el método AddInfrastructure
 
@@ -106,6 +107,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseCors("AllowAll");
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -130,16 +133,42 @@ using (var scope = app.Services.CreateScope())
 
     if (!await userRepository.UserExists("admin@admin.com"))
     {
-        var result = userRepository.CreateUser(
-    new AppUser()
+        var adminUser = new AppUser()
+        {
+            Email = "admin@admin.com",
+            UserName = "admin@admin.com",
+            FirstName = "Admin",
+            LastName = "Admin"
+        };
+        await userRepository.CreateUser(adminUser, "Admin123!");
+        await userRepository.AddToRoleAsync(adminUser, "Admin");
+    }
+    else
     {
-        Email = "admin@admin.com",
-        UserName = "admin@admin.com",
-        FirstName = "Admin",
-        LastName = "Admin"
-    },
-    "Admin123!"
-).Result;
+        // Garantiza que el admin existente tenga el rol aunque el seeding previo lo haya omitido
+        var adminRoles = await userRepository.GetUserRoles("admin@admin.com");
+        if (!adminRoles.Contains("Admin"))
+        {
+            var existingAdmin = await userRepository.GetUserByEmail("admin@admin.com");
+            if (existingAdmin != null)
+                await userRepository.AddToRoleAsync(existingAdmin, "Admin");
+        }
+    }
+
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+    if (!context.Categories.Any())
+    {
+        var categories = new[]
+        {
+            new Category { Id = Guid.NewGuid(), Name = "Acción" },
+            new Category { Id = Guid.NewGuid(), Name = "Drama" },
+            new Category { Id = Guid.NewGuid(), Name = "Terror" },
+            new Category { Id = Guid.NewGuid(), Name = "Infantiles" },
+            new Category { Id = Guid.NewGuid(), Name = "Música" },
+        };
+        context.Categories.AddRange(categories);
+        await context.SaveChangesAsync();
     }
 }
 app.Run();
